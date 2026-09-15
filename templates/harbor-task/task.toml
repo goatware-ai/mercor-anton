@@ -1,0 +1,70 @@
+# Harbor task manifest for a Project Anton task.
+#
+# This is a working reference task, built from the swe-smoke-002 example in
+# docs/05-mercor-studio-walkthrough.md. Copy the folder, then replace the whole
+# example — the exporter bug is a demo, not a starting point for content.
+#
+# [metadata] carries the Studio "Task" form, so the task type, qualitative
+# requirements and golden solution live next to the package they describe.
+# instruction.md IS the task prompt: paste it into Studio's "Task prompt" field
+# verbatim, never retype it (the walkthrough: keep the two identical).
+#
+# The Harbor field names follow the standard Harbor layout. Our docs only say
+# "standard Harbor format with optional tests folder" (03-task-workflow.md §2.2),
+# so anything Studio rejects gets recorded in FIELD-NOTES.md §2.
+
+version = "1.0"
+
+[metadata]
+author_name = "REPLACE"
+author_email = "REPLACE"
+
+# --- Studio "Task" form -----------------------------------------------------
+task_id = "swe-smoke-002"
+
+# The walkthrough says to enter "Terminal Bench". See FIELD-NOTES.md §1.5.
+task_format = "Terminal Bench"
+
+# Exactly one of: feature_implementation, bug_fix_deterministic,
+# bug_fix_nondeterministic, refactor, architecture_design, mvp,
+# codebase_migration, performance_optimization, test_writing.
+# Pick the primary requested outcome; secondary traits go in tags.
+task_type = "bug_fix_deterministic"
+
+# Requirements a unit test cannot settle. These are what make the task
+# non-trivial, and the prompt-specific rubrics are derived from them.
+qualitative_requirements = """\
+Root cause is the missing flush on context-manager exit, not the threshold. The \
+fix must keep fail-fast semantics: a short export raises rather than returning \
+quietly. Reuse the existing _flush() rather than adding a second write path.\
+"""
+
+# Empty when the task ships its own repository inside environment/.
+repository = ""
+base_commit = ""
+
+golden_solution = """\
+__exit__ never flushes, so a final buffer below FLUSH_THRESHOLD is discarded. \
+Flush in __exit__ and raise when _rows_written does not equal the number of rows \
+submitted.\
+"""
+
+# --- Task-design record (not a Studio field) --------------------------------
+# The global dimensions (1-8) this task is built to separate trajectories on.
+# If you cannot name at least two, the task will not produce a useful A/B signal.
+stressed_dimensions = [1, 4, 5, 7]
+tags = ["python", "buffered-io", "context-manager", "silent-truncation"]
+
+[verifier]
+timeout_sec = 300.0
+
+[agent]
+timeout_sec = 1800.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+# Rollouts run with internet disabled (03-task-workflow.md §3).
+allow_internet = false

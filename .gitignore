@@ -1,0 +1,12 @@
+# Python / lint caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Local Harbor / Docker run output — regenerable
+/jobs/
+/tasks/*/jobs/
+
+# macOS
+.DS_Store

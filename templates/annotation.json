@@ -1,0 +1,38 @@
+{
+  "task_id": "REPLACE — same as [metadata].task_id",
+  "task_type": "REPLACE — same as [metadata].task_type",
+  "trajectory_a_path": "trajectories/a.json",
+  "trajectory_b_path": "trajectories/b.json",
+  "part_0_goal_completeness": {
+    "status_a": "REPLACE — PASS | PARTIAL | FAIL",
+    "status_b": "REPLACE — PASS | PARTIAL | FAIL",
+    "reason": "REPLACE — what each trajectory delivered against the core goal, citing the verification output."
+  },
+  "prompt_specific_rubrics": [
+    {
+      "rubric_id": "ps_rubric_1",
+      "mapped_dimension": 0,
+      "source": "REPLACE — EXPLICIT_PROMPT | IMPLICIT_ENVIRONMENT | COMMON_ENGINEERING_KNOWLEDGE",
+      "statement": "REPLACE — Did the agent ...? (YES must be the good answer)",
+      "answer_a": "REPLACE — YES | NO",
+      "answer_b": "REPLACE — YES | NO",
+      "reason": "REPLACE — the step, file:line, test name or patch hunk that decides each answer."
+    }
+  ],
+  "global_dimensions": [
+    { "dimension_id": 1, "name": "Correctness", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 2, "name": "Architecture, Modularity & Trade-off Soundness", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 3, "name": "Codebase Conventions & Utility Reuse", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 4, "name": "Robustness, Safety & API Stability", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 5, "name": "Instruction Following & Scope Discipline", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 6, "name": "Planning, Research & Tool Proficiency", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 7, "name": "Verification & Testing Discipline", "score_a": 0, "score_b": 0, "reason": "REPLACE" },
+    { "dimension_id": 8, "name": "Communication: In-flight & Final Summary Quality", "score_a": 0, "score_b": 0, "reason": "REPLACE" }
+  ],
+  "final_quality_score_a": 0,
+  "final_quality_score_b": 0,
+  "pairwise_evaluation": {
+    "preference": "REPLACE — A_MUCH_BETTER | A_BETTER | TIE | B_BETTER | B_MUCH_BETTER",
+    "comparative_rationale": "REPLACE — the decisive differences between A and B, each tied to evidence."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Anton Studio Capture",
+  "version": "1.0.0",
+  "description": "Saves everything a Studio task needs for review into one HAR-shaped file for tasks/studio.py har. Runs locally; sends nothing anywhere.",
+  "content_scripts": [
+    {
+      "matches": ["https://studio.mercor.com/*"],
+      "js": ["capture.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ]
+}

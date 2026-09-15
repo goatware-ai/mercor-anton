@@ -10,8 +10,26 @@ Annotate one frozen Anton task's A/B pair.
 ## Run
 
 Read [annotation-prompt.md](../../../annotation-prompt.md) in full and follow it as the
-instructions for this turn. It owns the order of work, the judging rules and the
-deliverables.
+instructions for this turn. It owns the judging rules and the evidence standard.
+
+**Studio tasks come first.** A task claimed in Studio arrives already seeded, and
+often already annotated. Follow [docs/09-studio-flow.md](../../../docs/09-studio-flow.md)
+for the fetch steps, the order of work and the Studio form. Where it differs from
+annotation-prompt.md, docs/09 wins:
+
+- dimensions **2–9** (there is no Dimension 1), plus a 1–5 final score per side;
+- **8–15** rubrics, each side's YES rate below 75%;
+- the preference agrees with the final scores.
+
+Start every Studio task with:
+
+```bash
+python3 tasks/studio.py unpack "<task-export.json>"   # -> tasks/<task-id>/studio/
+python3 tasks/studio.py check tasks/<task-id>
+```
+
+Then read `tasks/<task-id>/notes.md` if it exists. It holds the fetch status and
+the findings so far.
 
 ## Inputs
 
@@ -39,7 +57,8 @@ the gate's package checks were skipped.
 ## Verify, then stop
 
 ```bash
-python3 tasks/gate.py tasks/<task-id>
+python3 tasks/studio.py check tasks/<task-id>   # Studio task: re-export after Save Changes first
+python3 tasks/gate.py tasks/<task-id>           # local annotation.json / Harbor package
 ```
 
 Every BLOCK must PASS. Then re-open each cited reference and confirm it says what

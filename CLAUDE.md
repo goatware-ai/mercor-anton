@@ -34,6 +34,20 @@ Three kinds of work happen here:
   - [05-mercor-studio-walkthrough.md](docs/05-mercor-studio-walkthrough.md): the
     Studio screens and field help text.
   - [06-samples.md](docs/06-samples.md): five good and five bad prompts, with why.
+  - [08-task-board.md](docs/08-task-board.md): the Studio board snapshot, observed
+    Studio schema, per-task audit notes and the CSV column map. Maintained by
+    Claude, not spec. Update it when a new board export arrives or a task changes
+    state.
+  - [09-studio-flow.md](docs/09-studio-flow.md): how a claimed Studio task is
+    fetched (export JSON, transcripts, bundle, reviewer feedback, HAR), then
+    reviewed, annotated and submitted. Maintained by Claude. **Start here for any
+    claimed task.**
+  - [10-autoqc-rules.md](docs/10-autoqc-rules.md): the exact AutoQC and reviewer-audit
+    criteria, generated from Studio's QC specs. Where they disagree with the docs,
+    these are what a submission is graded against.
+  - [11-annotation-form.md](docs/11-annotation-form.md): the Studio annotation form
+    itself — every field, the 1–5 band text per dimension, the option lists and the
+    15-word minimum on reasons. Generated from the world's `task_schema`.
 - **[FIELD-NOTES.md](FIELD-NOTES.md) wins where the docs contradict themselves or
   where Studio is observed to behave differently.** §1 lists twelve internal
   contradictions with a working default for each: which FAIL pairs are allowed,
@@ -92,6 +106,8 @@ annotation-prompt.md      end-to-end prompt for annotating one A/B pair
 templates/harbor-task/    working reference Harbor task (swe-smoke-002)
 templates/annotation.json evaluation-report skeleton, Studio dimension names
 tasks/gate.py             local pre-submission gate (package + annotation)
+tasks/studio.py           Studio capture/export unpacker + Studio-form checks
+tools/studio-capture/     Chrome extension: one-click capture of a Studio task
 tasks/<task-id>/          one folder per task — see below
 drafts/, notes/           work in progress, per-task write-ups
 .claude/skills/           create-task, annotate-task, review-task
@@ -115,6 +131,11 @@ verbatim.
 ```bash
 python3 tasks/gate.py tasks/<task-id>        # every BLOCK line must PASS before submitting
 python3 tasks/gate.py templates/harbor-task  # blocks only on its REPLACE author fields
+python3 tasks/studio.py har "<file.har>"            # sanitized HAR -> studio/, harbor/, trajectories/ (primary fetch)
+python3 tasks/studio.py unpack "<task-export.json>"  # Studio export -> tasks/<task-id>/studio/
+python3 tasks/studio.py rules tasks/<task-id>/studio/qc-specs.json  # regenerate docs/10-autoqc-rules.md
+python3 tasks/studio.py form tasks/<task-id>/studio/form-schema.json # regenerate docs/11-annotation-form.md
+python3 tasks/studio.py check tasks/<task-id>        # Studio-form rules; 0 BLOCK before submitting
 ```
 
 There's no Studio CLI. Rollouts, the Task form and the annotation form are all

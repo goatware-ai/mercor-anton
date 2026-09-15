@@ -1,0 +1,983 @@
+diff --git a/graph-ui/src/components/FilterPanel.tsx b/graph-ui/src/components/FilterPanel.tsx
+index 6f1c7ca..214a2b8 100644
+--- a/graph-ui/src/components/FilterPanel.tsx
++++ b/graph-ui/src/components/FilterPanel.tsx
+@@ -1,6 +1,6 @@
+ import { useMemo } from "react";
+ import { ScrollArea } from "@/components/ui/scroll-area";
+-import { colorForLabel } from "../lib/colors";
++import { colorForLabel, STATUS_LEGEND } from "../lib/colors";
+ import type { GraphData } from "../lib/types";
+ 
+ interface FilterPanelProps {
+@@ -13,6 +13,49 @@ interface FilterPanelProps {
+   onToggleShowLabels: () => void;
+   onEnableAll: () => void;
+   onDisableAll: () => void;
++  /* Dead-code view */
++  deadCodeView: boolean;
++  showOnlyDead: boolean;
++  hideEntryPoints: boolean;
++  hideTests: boolean;
++  onToggleDeadCodeView: () => void;
++  onToggleShowOnlyDead: () => void;
++  onToggleHideEntryPoints: () => void;
++  onToggleHideTests: () => void;
++}
++
++/* Checkbox row matching the existing "Show labels" toggle style */
++function CheckRow({
++  checked,
++  onToggle,
++  label,
++  count,
++}: {
++  checked: boolean;
++  onToggle: () => void;
++  label: string;
++  count?: number;
++}) {
++  return (
++    <button
++      onClick={onToggle}
++      className={`flex items-center gap-1.5 text-[11px] font-medium transition-all ${
++        checked ? "text-primary" : "text-foreground/40"
++      }`}
++    >
++      <span
++        className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${
++          checked ? "border-primary bg-primary/20" : "border-foreground/15"
++        }`}
++      >
++        {checked && <span className="text-primary text-[9px]">✓</span>}
++      </span>
++      {label}
++      {count !== undefined && (
++        <span className="text-foreground/25 tabular-nums">{count.toLocaleString()}</span>
++      )}
++    </button>
++  );
+ }
+ 
+ export function FilterPanel({
+@@ -25,18 +68,32 @@ export function FilterPanel({
+   onToggleShowLabels,
+   onEnableAll,
+   onDisableAll,
++  deadCodeView,
++  showOnlyDead,
++  hideEntryPoints,
++  hideTests,
++  onToggleDeadCodeView,
++  onToggleShowOnlyDead,
++  onToggleHideEntryPoints,
++  onToggleHideTests,
+ }: FilterPanelProps) {
+-  const { labelCounts, edgeTypeCounts } = useMemo(() => {
++  const { labelCounts, edgeTypeCounts, statusCounts } = useMemo(() => {
+     const lc = new Map<string, number>();
+     for (const n of data.nodes) lc.set(n.label, (lc.get(n.label) ?? 0) + 1);
+     const ec = new Map<string, number>();
+     for (const e of data.edges) ec.set(e.type, (ec.get(e.type) ?? 0) + 1);
++    const sc = new Map<string, number>();
++    for (const n of data.nodes)
++      if (n.status) sc.set(n.status, (sc.get(n.status) ?? 0) + 1);
+     return {
+       labelCounts: [...lc.entries()].sort((a, b) => b[1] - a[1]),
+       edgeTypeCounts: [...ec.entries()].sort((a, b) => b[1] - a[1]),
++      statusCounts: sc,
+     };
+   }, [data]);
+ 
++  const deadCount = statusCounts.get("dead") ?? 0;
++
+   return (
+     <div className="flex flex-col shrink-0 max-h-[45%] border-b border-border/40">
+       {/* Header row — always visible */}
+@@ -106,6 +163,53 @@ export function FilterPanel({
+         </div>
+       </ScrollArea>
+ 
++      {/* Dead-code view */}
++      <div className="px-4 pt-2 border-t border-border/30 space-y-2 shrink-0">
++        <div className="flex items-center justify-between">
++          <span className="text-[10px] text-foreground/30 uppercase tracking-widest">
++            Dead code
++          </span>
++          <span className="text-[10px] text-red-400/80 tabular-nums">
++            {deadCount.toLocaleString()} dead
++          </span>
++        </div>
++
++        <CheckRow
++          checked={deadCodeView}
++          onToggle={onToggleDeadCodeView}
++          label="Color by status"
++        />
++        <CheckRow
++          checked={showOnlyDead}
++          onToggle={onToggleShowOnlyDead}
++          label="Show only dead code"
++        />
++        <CheckRow
++          checked={hideEntryPoints}
++          onToggle={onToggleHideEntryPoints}
++          label="Hide entry points"
++        />
++        <CheckRow checked={hideTests} onToggle={onToggleHideTests} label="Hide tests" />
++
++        {/* Legend (only meaningful while colored by status) */}
++        {deadCodeView && (
++          <div className="flex flex-wrap gap-x-2 gap-y-1 pt-1">
++            {STATUS_LEGEND.map((s) => (
++              <span
++                key={s.status}
++                className="inline-flex items-center gap-1 text-[9px] text-foreground/40"
++              >
++                <span
++                  className="w-[6px] h-[6px] rounded-full"
++                  style={{ backgroundColor: s.color }}
++                />
++                {s.label}
++              </span>
++            ))}
++          </div>
++        )}
++      </div>
++
+       {/* Display options — pinned footer */}
+       <div className="px-4 py-2.5 border-t border-border/20 shrink-0">
+         <button
+diff --git a/graph-ui/src/components/GraphTab.tsx b/graph-ui/src/components/GraphTab.tsx
+index 040e6a4..8d267ca 100644
+--- a/graph-ui/src/components/GraphTab.tsx
++++ b/graph-ui/src/components/GraphTab.tsx
+@@ -11,7 +11,8 @@ import { FilterPanel } from "./FilterPanel";
+ import { NodeDetailPanel } from "./NodeDetailPanel";
+ import { ResizeHandle } from "./ResizeHandle";
+ import { ErrorBoundary } from "./ErrorBoundary";
+-import type { GraphNode, GraphData } from "../lib/types";
++import type { GraphNode, GraphData, RepoInfo } from "../lib/types";
++import { colorForStatus } from "../lib/colors";
+ 
+ /* Persist panel widths */
+ function loadWidth(key: string, fallback: number): number {
+@@ -40,6 +41,7 @@ export function GraphTab({ project }: GraphTabProps) {
+   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+   const [cameraTarget, setCameraTarget] = useState<CameraTarget | null>(null);
++  const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
+   const [showLabels, setShowLabels] = useState(true);
+   const [leftWidth, setLeftWidth] = useState(() => loadWidth("cbm-left-w", 260));
+   const [rightWidth, setRightWidth] = useState(() => loadWidth("cbm-right-w", 280));
+@@ -49,6 +51,12 @@ export function GraphTab({ project }: GraphTabProps) {
+   const [enabledLabels, setEnabledLabels] = useState<Set<string>>(new Set());
+   const [enabledEdgeTypes, setEnabledEdgeTypes] = useState<Set<string>>(new Set());
+ 
++  /* Dead-code view: recolor by status + status-based filters */
++  const [deadCodeView, setDeadCodeView] = useState(false);
++  const [showOnlyDead, setShowOnlyDead] = useState(false);
++  const [hideEntryPoints, setHideEntryPoints] = useState(false);
++  const [hideTests, setHideTests] = useState(false);
++
+   /* Initialize filters when data loads */
+   useEffect(() => {
+     if (!data) return;
+@@ -67,7 +75,19 @@ export function GraphTab({ project }: GraphTabProps) {
+   const filteredData: GraphData | null = useMemo(() => {
+     if (!data) return null;
+ 
+-    const nodes = data.nodes.filter((n) => enabledLabels.has(n.label));
++    /* Status-based filters (dead-code view) */
++    const statusOk = (n: GraphNode) => {
++      if (showOnlyDead && n.status !== "dead") return false;
++      if (hideEntryPoints && n.status === "entry") return false;
++      if (hideTests && n.status === "test") return false;
++      return true;
++    };
++    /* Recolor by status when the dead-code view is on */
++    const paint = (n: GraphNode): GraphNode =>
++      deadCodeView ? { ...n, color: colorForStatus(n.status) } : n;
++    const keep = (n: GraphNode) => enabledLabels.has(n.label) && statusOk(n);
++
++    const nodes = data.nodes.filter(keep).map(paint);
+     const nodeIds = new Set(nodes.map((n) => n.id));
+     const edges = data.edges.filter(
+       (e) =>
+@@ -77,7 +97,7 @@ export function GraphTab({ project }: GraphTabProps) {
+     );
+ 
+     const linked_projects = data.linked_projects?.map((lp) => {
+-      const lpNodes = lp.nodes.filter((n) => enabledLabels.has(n.label));
++      const lpNodes = lp.nodes.filter(keep).map(paint);
+       const lpIds = new Set(lpNodes.map((n) => n.id));
+       const lpEdges = lp.edges.filter(
+         (e) =>
+@@ -91,7 +111,15 @@ export function GraphTab({ project }: GraphTabProps) {
+     });
+ 
+     return { nodes, edges, total_nodes: data.total_nodes, linked_projects };
+-  }, [data, enabledLabels, enabledEdgeTypes]);
++  }, [
++    data,
++    enabledLabels,
++    enabledEdgeTypes,
++    deadCodeView,
++    showOnlyDead,
++    hideEntryPoints,
++    hideTests,
++  ]);
+ 
+   useEffect(() => {
+     if (project) {
+@@ -101,6 +129,24 @@ export function GraphTab({ project }: GraphTabProps) {
+     }
+   }, [project, fetchOverview]);
+ 
++  /* Fetch git remote metadata for GitHub deep-links */
++  useEffect(() => {
++    if (!project) {
++      setRepoInfo(null);
++      return;
++    }
++    let cancelled = false;
++    fetch(`/api/repo-info?project=${encodeURIComponent(project)}`)
++      .then((r) => (r.ok ? r.json() : null))
++      .then((d) => {
++        if (!cancelled && d && !d.error) setRepoInfo(d as RepoInfo);
++      })
++      .catch(() => {});
++    return () => {
++      cancelled = true;
++    };
++  }, [project]);
++
+   const handleSelectPath = useCallback(
+     (path: string, nodeIds: Set<number>) => {
+       if (!filteredData || !path || nodeIds.size === 0) {
+@@ -239,6 +285,14 @@ export function GraphTab({ project }: GraphTabProps) {
+           onToggleShowLabels={() => setShowLabels((v) => !v)}
+           onEnableAll={enableAll}
+           onDisableAll={disableAll}
++          deadCodeView={deadCodeView}
++          showOnlyDead={showOnlyDead}
++          hideEntryPoints={hideEntryPoints}
++          hideTests={hideTests}
++          onToggleDeadCodeView={() => setDeadCodeView((v) => !v)}
++          onToggleShowOnlyDead={() => setShowOnlyDead((v) => !v)}
++          onToggleHideEntryPoints={() => setHideEntryPoints((v) => !v)}
++          onToggleHideTests={() => setHideTests((v) => !v)}
+         />
+         <Sidebar
+           nodes={filteredData.nodes}
+@@ -354,6 +408,8 @@ export function GraphTab({ project }: GraphTabProps) {
+               node={selectedNode}
+               allNodes={filteredData.nodes}
+               allEdges={filteredData.edges}
++              project={project}
++              repoInfo={repoInfo}
+               onClose={() => {
+                 setSelectedNode(null);
+                 setHighlightedIds(null);
+diff --git a/graph-ui/src/components/NodeDetailPanel.tsx b/graph-ui/src/components/NodeDetailPanel.tsx
+index 2cdb982..54be52f 100644
+--- a/graph-ui/src/components/NodeDetailPanel.tsx
++++ b/graph-ui/src/components/NodeDetailPanel.tsx
+@@ -1,7 +1,8 @@
+-import { useMemo } from "react";
++import { useMemo, useState, useEffect } from "react";
+ import { ScrollArea } from "@/components/ui/scroll-area";
+ import { colorForLabel } from "../lib/colors";
+-import type { GraphNode, GraphEdge } from "../lib/types";
++import { callTool } from "../api/rpc";
++import type { GraphNode, GraphEdge, RepoInfo } from "../lib/types";
+ 
+ interface Connection {
+   node: GraphNode;
+@@ -13,11 +14,77 @@ interface NodeDetailPanelProps {
+   node: GraphNode;
+   allNodes: GraphNode[];
+   allEdges: GraphEdge[];
++  project: string | null;
++  repoInfo: RepoInfo | null;
+   onClose: () => void;
+   onNavigate: (node: GraphNode) => void;
+ }
+ 
+-export function NodeDetailPanel({ node, allNodes, allEdges, onClose, onNavigate }: NodeDetailPanelProps) {
++interface SnippetResult {
++  source?: string;
++  start_line?: number;
++  end_line?: number;
++}
++
++function lineSuffix(node: GraphNode): string {
++  if (!node.start_line) return "";
++  const end = node.end_line && node.end_line !== node.start_line ? `-L${node.end_line}` : "";
++  return `#L${node.start_line}${end}`;
++}
++
++/* Encode each path segment so an unusual file_path can't break (or escape) the
++ * URL. The scheme is already https-forced by the backend (/api/repo-info);
++ * this is defense-in-depth on the path. */
++function encodePath(p: string): string {
++  return p.split("/").map(encodeURIComponent).join("/");
++}
++
++/* GitHub (or GitLab) deep-link, or null when we lack remote/path/line info. */
++function githubUrl(node: GraphNode, repoInfo: RepoInfo | null): string | null {
++  if (!repoInfo?.blob_base || !node.file_path) return null;
++  return `${repoInfo.blob_base}/${encodePath(node.file_path)}${lineSuffix(node)}`;
++}
++
++export function NodeDetailPanel({
++  node,
++  allNodes,
++  allEdges,
++  project,
++  repoInfo,
++  onClose,
++  onNavigate,
++}: NodeDetailPanelProps) {
++  const [code, setCode] = useState<string | null>(null);
++  const [codeLoading, setCodeLoading] = useState(false);
++  const [codeError, setCodeError] = useState<string | null>(null);
++
++  /* Reset the fetched code whenever the selected node changes. */
++  useEffect(() => {
++    setCode(null);
++    setCodeError(null);
++    setCodeLoading(false);
++  }, [node.id]);
++
++  const canFetchCode = Boolean(project && node.qualified_name);
++  const ghUrl = githubUrl(node, repoInfo);
++
++  const loadCode = async () => {
++    if (!project || !node.qualified_name) return;
++    setCodeLoading(true);
++    setCodeError(null);
++    try {
++      const res = await callTool<SnippetResult>("get_code_snippet", {
++        qualified_name: node.qualified_name,
++        project,
++      });
++      setCode(res.source ?? "(source not available)");
++    } catch (e) {
++      setCodeError(e instanceof Error ? e.message : "Failed to load code");
++    } finally {
++      setCodeLoading(false);
++    }
++  };
++
+   const connections = useMemo(() => {
+     const nodeMap = new Map<number, GraphNode>();
+     for (const n of allNodes) nodeMap.set(n.id, n);
+@@ -65,7 +132,45 @@ export function NodeDetailPanel({ node, allNodes, allEdges, onClose, onNavigate
+         </div>
+ 
+         {node.file_path && (
+-          <p className="text-[11px] text-foreground/30 font-mono mt-2 break-all leading-relaxed">{node.file_path}</p>
++          <p className="text-[11px] text-foreground/30 font-mono mt-2 break-all leading-relaxed">
++            {node.file_path}
++            {node.start_line ? (
++              <span className="text-foreground/45">
++                {" "}:{node.start_line}
++                {node.end_line && node.end_line !== node.start_line ? `-${node.end_line}` : ""}
++              </span>
++            ) : null}
++          </p>
++        )}
++
++        {/* Code actions */}
++        <div className="flex flex-wrap items-center gap-2 mt-2.5">
++          {canFetchCode && (
++            <button
++              onClick={code ? () => setCode(null) : loadCode}
++              disabled={codeLoading}
++              className="px-2.5 py-1 rounded-md bg-primary/15 text-primary text-[11px] font-medium hover:bg-primary/25 transition-colors disabled:opacity-50"
++            >
++              {codeLoading ? "Loading…" : code ? "Hide code" : "Show code"}
++            </button>
++          )}
++          {ghUrl && (
++            <a
++              href={ghUrl}
++              target="_blank"
++              rel="noopener noreferrer"
++              className="px-2.5 py-1 rounded-md bg-white/[0.05] text-foreground/60 text-[11px] font-medium hover:bg-white/[0.09] hover:text-foreground/90 transition-colors"
++            >
++              Open on GitHub ↗
++            </a>
++          )}
++        </div>
++
++        {codeError && <p className="text-[11px] text-red-400/80 mt-2">{codeError}</p>}
++        {code && (
++          <pre className="mt-2 max-h-[300px] overflow-auto rounded-md bg-black/40 border border-white/[0.06] p-2.5 text-[10.5px] leading-relaxed font-mono text-foreground/75 whitespace-pre">
++            {code}
++          </pre>
+         )}
+ 
+         {/* Stats */}
+diff --git a/graph-ui/src/components/NodeTooltip.tsx b/graph-ui/src/components/NodeTooltip.tsx
+index 9cb6630..ea7c16b 100644
+--- a/graph-ui/src/components/NodeTooltip.tsx
++++ b/graph-ui/src/components/NodeTooltip.tsx
+@@ -1,11 +1,18 @@
+ import { Html } from "@react-three/drei";
+ import type { GraphNode } from "../lib/types";
+-import { colorForLabel } from "../lib/colors";
++import { colorForLabel, colorForStatus } from "../lib/colors";
+ 
+ interface NodeTooltipProps {
+   node: GraphNode;
+ }
+ 
++function lineRange(node: GraphNode): string | null {
++  if (!node.start_line) return null;
++  if (node.end_line && node.end_line !== node.start_line)
++    return `L${node.start_line}-${node.end_line}`;
++  return `L${node.start_line}`;
++}
++
+ export function NodeTooltip({ node }: NodeTooltipProps) {
+   return (
+     <Html
+@@ -23,8 +30,26 @@ export function NodeTooltip({ node }: NodeTooltipProps) {
+           <span className="text-white/30 ml-1 shrink-0">{node.label}</span>
+         </div>
+         {node.file_path && (
+-          <p className="text-white/30 font-mono truncate">{node.file_path}</p>
++          <p className="text-white/30 font-mono truncate">
++            {node.file_path}
++            {lineRange(node) && <span className="text-white/40"> · {lineRange(node)}</span>}
++          </p>
++        )}
++        {node.status && node.status !== "structural" && (
++          <div className="flex items-center gap-1.5 mt-1">
++            <span
++              className="w-1.5 h-1.5 rounded-full shrink-0"
++              style={{ backgroundColor: colorForStatus(node.status) }}
++            />
++            <span className="text-white/45">{node.status}</span>
++            {node.in_calls !== undefined && (
++              <span className="text-white/25">
++                · {node.in_calls} caller{node.in_calls === 1 ? "" : "s"}
++              </span>
++            )}
++          </div>
+         )}
++        <p className="text-white/20 mt-1 text-[10px]">click for code →</p>
+       </div>
+     </Html>
+   );
+diff --git a/graph-ui/src/lib/colors.ts b/graph-ui/src/lib/colors.ts
+index 4fb3e8b..64ef0e9 100644
+--- a/graph-ui/src/lib/colors.ts
++++ b/graph-ui/src/lib/colors.ts
+@@ -20,6 +20,37 @@ export function colorForLabel(label: string): string {
+   return LABEL_COLORS[label] ?? DEFAULT_COLOR;
+ }
+ 
++/* Dead-code status → color (matches layout3d.c status strings).
++ *   dead     zero callers + zero usages, not entry/test/exported
++ *   single   exactly one caller
++ *   entry    entry points / routes
++ *   test     test code
++ *   normal   healthy (>=2 callers)
++ *   exported/structural → dimmed grey (not dead-code candidates) */
++const STATUS_COLORS: Record<string, string> = {
++  dead: "#ef4444",
++  single: "#f97316",
++  entry: "#3b82f6",
++  test: "#a855f7",
++  normal: "#22c55e",
++  exported: "#475569",
++  structural: "#334155",
++};
++
++const STATUS_DEFAULT = "#334155";
++
++export function colorForStatus(status?: string): string {
++  return status ? (STATUS_COLORS[status] ?? STATUS_DEFAULT) : STATUS_DEFAULT;
++}
++
++export const STATUS_LEGEND: { status: string; label: string; color: string }[] = [
++  { status: "dead", label: "Dead (0 callers)", color: STATUS_COLORS.dead },
++  { status: "single", label: "One caller", color: STATUS_COLORS.single },
++  { status: "entry", label: "Entry / route", color: STATUS_COLORS.entry },
++  { status: "test", label: "Test", color: STATUS_COLORS.test },
++  { status: "normal", label: "Normal", color: STATUS_COLORS.normal },
++];
++
+ /* Stellar spectral type legend (for the graph view) */
+ export const STELLAR_LEGEND = [
+   { type: "O (Blue Giant)", color: "#80a0ff", description: "50+ connections" },
+diff --git a/graph-ui/src/lib/types.ts b/graph-ui/src/lib/types.ts
+index 0286a35..a10b53d 100644
+--- a/graph-ui/src/lib/types.ts
++++ b/graph-ui/src/lib/types.ts
+@@ -8,8 +8,32 @@ export interface GraphNode {
+   label: string;
+   name: string;
+   file_path?: string;
++  qualified_name?: string;
++  start_line?: number;
++  end_line?: number;
+   size: number;
+   color: string;
++  /* Dead-code classification from the backend layout (layout3d.c). */
++  status?: NodeStatus;
++  in_calls?: number;
++}
++
++export type NodeStatus =
++  | "dead"
++  | "single"
++  | "entry"
++  | "test"
++  | "exported"
++  | "normal"
++  | "structural";
++
++/* Git remote metadata for building GitHub deep-links (/api/repo-info). */
++export interface RepoInfo {
++  root_path: string;
++  branch: string;
++  remote_url: string;
++  web_base: string; /* e.g. github.com/<org>/<repo> */
++  blob_base: string; /* e.g. github.com/<org>/<repo>/blob/<branch> */
+ }
+ 
+ export interface GraphEdge {
+diff --git a/scripts/security-allowlist.txt b/scripts/security-allowlist.txt
+index 259a40e..30d5126 100644
+--- a/scripts/security-allowlist.txt
++++ b/scripts/security-allowlist.txt
+@@ -56,3 +56,4 @@ URL:https://github.com/DeusData/codebase-memory-mcp/releases/latest:version chec
+ URL:http://127.0.0.1:UI server binding (localhost only)
+ URL:https://www.sqlite.org/c3ref/c_checkpoint_full.html:sqlite WAL checkpoint API doc reference (comment only, not a network call)
+ URL:https://github.com/DeusData/codebase-memory-mcp:project repository self-reference in update/star notice (src/mcp/mcp.c)
++URL:https://%s:GitHub blob-URL construction in src/ui/http_server.c cbm_ui_git_web_base — https-forces the repo web base for frontend deep-links (not a network call)
+diff --git a/src/ui/http_server.c b/src/ui/http_server.c
+index 03ee07d..578ccd4 100644
+--- a/src/ui/http_server.c
++++ b/src/ui/http_server.c
+@@ -21,6 +21,11 @@
+ #include "store/store.h"
+ #include "watcher/watcher.h"
+ #include "cli/cli.h"
++#include "git/git_context.h"
++
++#if defined(HAVE_LIBGIT2)
++#include <git2.h> /* git_repository_open, git_remote_lookup, git_remote_url */
++#endif
+ /* pipeline.h no longer needed — indexing runs as subprocess */
+ #include "foundation/log.h"
+ #include "foundation/platform.h"
+@@ -115,7 +120,7 @@ static void handle_ui_config(cbm_http_conn_t *c, const cbm_http_req_t *req) {
+ 
+ struct cbm_http_server {
+     cbm_httpd_t *listener;
+-    cbm_mcp_server_t *mcp; /* own MCP server instance (read-only) */
++    cbm_mcp_server_t *mcp;       /* own MCP server instance (read-only) */
+     struct cbm_watcher *watcher; /* external watcher ref (not owned) */
+     atomic_int stop_flag;
+     int port;
+@@ -169,6 +174,171 @@ static void db_path_for_project(const char *project, char *buf, size_t bufsz) {
+     snprintf(buf, bufsz, "%s/%s.db", dir, project);
+ }
+ 
++/* ── Git remote → GitHub deep-link base (/api/repo-info) ───────── */
++
++/* Return a copy of `url` with any "user[:password]@" userinfo removed from the
++ * scheme://authority form, so credentials are never echoed back to the client.
++ * scp-style (git@host:path) is returned unchanged: "git" there is a login name,
++ * not a secret. malloc'd copy, or NULL when url is NULL. Caller frees. */
++char *cbm_ui_git_strip_credentials(const char *url) {
++    if (!url)
++        return NULL;
++    const char *sep = strstr(url, "://");
++    if (!sep)
++        return strdup(url); /* scp-style / opaque — no scheme userinfo to strip */
++    const char *authority = sep + 3;
++    const char *slash = strchr(authority, '/');
++    const char *at = strchr(authority, '@');
++    if (!at || (slash && at > slash))
++        return strdup(url); /* '@' is in the path, not the authority → no creds */
++    size_t prefix = (size_t)(authority - url); /* "scheme://" */
++    const char *rest = at + 1;
++    size_t out_len = prefix + strlen(rest) + 1;
++    char *out = malloc(out_len);
++    if (!out)
++        return NULL;
++    memcpy(out, url, prefix);
++    memcpy(out + prefix, rest, strlen(rest) + 1);
++    return out;
++}
++
++/* Normalize a git remote URL (scp-style, ssh://, https://) to a canonical
++ * "https://host/org/repo" web base with any trailing ".git" and any embedded
++ * credentials removed. Returns a malloc'd string or NULL if the shape isn't
++ * recognized. Caller frees. */
++char *cbm_ui_git_web_base(const char *url) {
++    if (!url || !url[0])
++        return NULL;
++    char host_path[1024] = {0}; /* "host/org/repo" */
++    if (strncmp(url, "git@", 4) == 0) {
++        const char *at = url + 4;
++        const char *colon = strchr(at, ':');
++        if (!colon)
++            return NULL;
++        snprintf(host_path, sizeof(host_path), "%.*s/%s", (int)(colon - at), at, colon + 1);
++    } else {
++        const char *p = strstr(url, "://");
++        if (!p)
++            return NULL;
++        p += 3;
++        const char *at = strchr(p, '@'); /* strip any embedded credentials */
++        if (at)
++            p = at + 1;
++        snprintf(host_path, sizeof(host_path), "%s", p);
++    }
++    size_t l = strlen(host_path);
++    if (l > 4 && strcmp(host_path + l - 4, ".git") == 0)
++        host_path[l - 4] = '\0';
++    l = strlen(host_path);
++    if (l > 0 && host_path[l - 1] == '/')
++        host_path[l - 1] = '\0';
++    size_t out_sz = strlen(host_path) + 9; /* "https://" (8) + NUL */
++    char *out = malloc(out_sz);
++    if (!out)
++        return NULL;
++    /* Legitimate GitHub blob-URL construction, not a network call — the scheme
++     * is https-forced here so the frontend deep-link can never be downgraded.
++     * Allow-listed in scripts/security-allowlist.txt (URL:https://%s). */
++    snprintf(out, out_sz, "https://%s", host_path);
++    return out;
++}
++
++/* Read the "origin" remote URL for the repo at root_path. malloc'd or NULL.
++ * libgit2 is initialized once at process start by cbm_alloc_init() (which also
++ * binds its allocator to mimalloc) — do NOT git_libgit2_init()/shutdown() here:
++ * a per-request shutdown could drop the global refcount and tear down that
++ * allocator binding mid-process. */
++static char *git_origin_remote_url(const char *root_path) {
++#if defined(HAVE_LIBGIT2)
++    git_repository *repo = NULL;
++    char *out = NULL;
++    if (git_repository_open(&repo, root_path) == 0) {
++        git_remote *rem = NULL;
++        if (git_remote_lookup(&rem, repo, "origin") == 0) {
++            const char *u = git_remote_url(rem);
++            if (u)
++                out = strdup(u);
++            git_remote_free(rem);
++        }
++        git_repository_free(repo);
++    }
++    return out;
++#else
++    (void)root_path;
++    return NULL;
++#endif
++}
++
++/* GET /api/repo-info?project=NAME → { root_path, branch, remote_url, web_base,
++ * blob_base }. blob_base is "<web_base>/blob/<branch>" ready for the frontend to
++ * append "/<file_path>#L<start>-L<end>". remote_url is credential-stripped;
++ * fields are empty strings when unknown (e.g. no git remote). */
++static void handle_repo_info(cbm_http_conn_t *c, const cbm_http_req_t *req) {
++    char project[256] = {0};
++    if (!cbm_http_query_param(req->query, "project", project, (int)sizeof(project)) ||
++        project[0] == '\0') {
++        cbm_http_replyf(c, 400, g_cors_json, "{\"error\":\"missing project parameter\"}");
++        return;
++    }
++
++    char db_path[1024];
++    db_path_for_project(project, db_path, sizeof(db_path));
++    if (db_path[0] == '\0' || !cbm_file_exists(db_path)) {
++        cbm_http_replyf(c, 404, g_cors_json, "{\"error\":\"project not found\"}");
++        return;
++    }
++    cbm_store_t *store = cbm_store_open_path(db_path);
++    if (!store) {
++        cbm_http_replyf(c, 500, g_cors_json, "{\"error\":\"cannot open store\"}");
++        return;
++    }
++
++    char root_path[1024] = {0};
++    cbm_project_t proj;
++    memset(&proj, 0, sizeof(proj));
++    if (cbm_store_get_project(store, project, &proj) == CBM_STORE_OK && proj.root_path) {
++        snprintf(root_path, sizeof(root_path), "%s", proj.root_path);
++    }
++    cbm_project_free_fields(&proj);
++    cbm_store_close(store);
++
++    char branch[256] = {0};
++    if (root_path[0]) {
++        cbm_git_context_t gctx;
++        memset(&gctx, 0, sizeof(gctx));
++        if (cbm_git_context_resolve(root_path, &gctx) == 0 && gctx.branch) {
++            snprintf(branch, sizeof(branch), "%s", gctx.branch);
++        }
++        cbm_git_context_free(&gctx);
++    }
++
++    char *remote = root_path[0] ? git_origin_remote_url(root_path) : NULL;
++    char *remote_safe = cbm_ui_git_strip_credentials(remote); /* never echo secrets */
++    char *web_base = cbm_ui_git_web_base(remote);
++
++    char blob_base[1152] = {0};
++    if (web_base && web_base[0] && branch[0]) {
++        snprintf(blob_base, sizeof(blob_base), "%s/blob/%s", web_base, branch);
++    }
++
++    /* JSON-escape the free-form fields. */
++    char esc_root[2048], esc_branch[512], esc_remote[2048], esc_web[2048], esc_blob[2304];
++    cbm_json_escape(esc_root, (int)sizeof(esc_root), root_path);
++    cbm_json_escape(esc_branch, (int)sizeof(esc_branch), branch);
++    cbm_json_escape(esc_remote, (int)sizeof(esc_remote), remote_safe ? remote_safe : "");
++    cbm_json_escape(esc_web, (int)sizeof(esc_web), web_base ? web_base : "");
++    cbm_json_escape(esc_blob, (int)sizeof(esc_blob), blob_base);
++
++    cbm_http_replyf(c, 200, g_cors_json,
++                    "{\"root_path\":\"%s\",\"branch\":\"%s\",\"remote_url\":\"%s\","
++                    "\"web_base\":\"%s\",\"blob_base\":\"%s\"}",
++                    esc_root, esc_branch, esc_remote, esc_web, esc_blob);
++
++    free(remote);
++    free(remote_safe);
++    free(web_base);
++}
++
+ /* ── Log ring buffer ──────────────────────────────────────────── */
+ 
+ #define LOG_RING_SIZE 500
+@@ -1414,6 +1584,12 @@ static void dispatch_request(cbm_http_server_t *srv, cbm_http_conn_t *c,
+         return;
+     }
+ 
++    /* GET /api/repo-info → git remote / branch for GitHub deep-links */
++    if (is_get && cbm_http_path_match(req->path, "/api/repo-info*")) {
++        handle_repo_info(c, req);
++        return;
++    }
++
+     /* POST /api/index → start background indexing */
+     if (is_post && cbm_http_path_match(req->path, "/api/index")) {
+         handle_index_start(c, req);
+diff --git a/src/ui/http_server.h b/src/ui/http_server.h
+index 2746c97..4aa98a6 100644
+--- a/src/ui/http_server.h
++++ b/src/ui/http_server.h
+@@ -55,4 +55,16 @@ void cbm_http_server_set_binary_path(const char *path);
+ /* Resolve argv[0] into an executable path suitable for subprocess spawning. */
+ bool cbm_http_server_resolve_binary_path(const char *argv0, char *out, size_t outsz);
+ 
++/* Pure git-remote URL helpers used by GET /api/repo-info. Exposed for tests. */
++
++/* Normalize a git remote (scp-style / ssh:// / https://) to a canonical
++ * "https://host/org/repo" web base, with trailing ".git" and any embedded
++ * credentials removed. malloc'd or NULL. Caller frees. */
++char *cbm_ui_git_web_base(const char *url);
++
++/* Copy `url` with any "user[:password]@" userinfo stripped from a
++ * scheme://authority URL (scp-style is left unchanged). malloc'd, or NULL when
++ * `url` is NULL. Caller frees. */
++char *cbm_ui_git_strip_credentials(const char *url);
++
+ #endif /* CBM_UI_HTTP_SERVER_H */
+diff --git a/src/ui/layout3d.c b/src/ui/layout3d.c
+index 771d7a4..3ff3fdb 100644
+--- a/src/ui/layout3d.c
++++ b/src/ui/layout3d.c
+@@ -37,6 +37,63 @@
+ #define LOCAL_ITERATIONS 40
+ #define Z_DEPTH_SPACING 50.0f /* gentle z-layering per call depth */
+ 
++/* cbm_store_batch_count_degrees builds a bound "?,?,..." IN clause into a fixed
++ * 4KB buffer (~2045 placeholders max) but binds every id passed — so calling it
++ * with more ids than fit silently drops the tail (their degree stays 0, which
++ * here would masquerade as dead code). Feed it in safe-sized chunks. */
++#define DEAD_DEGREE_CHUNK 500
++
++/* ── Dead-code node-flag parsing ──────────────────────────────── */
++
++typedef struct {
++    bool is_entry;
++    bool is_test;
++    bool is_exported;
++    bool is_route;
++} node_flags_t;
++
++/* Truthy across the representations properties_json may use (JSON bool, the
++ * integer 1 sqlite/json_extract emits, or a "true"/"1" string). */
++static bool json_truthy(yyjson_val *v) {
++    if (!v)
++        return false;
++    if (yyjson_is_bool(v))
++        return yyjson_get_bool(v);
++    if (yyjson_is_int(v))
++        return yyjson_get_int(v) != 0;
++    if (yyjson_is_uint(v))
++        return yyjson_get_uint(v) != 0;
++    if (yyjson_is_real(v))
++        return yyjson_get_real(v) != 0.0;
++    if (yyjson_is_str(v)) {
++        const char *s = yyjson_get_str(v);
++        return s && s[0] && strcmp(s, "0") != 0 && strcmp(s, "false") != 0;
++    }
++    return false;
++}
++
++static node_flags_t parse_node_flags(const char *props_json) {
++    node_flags_t f = {false, false, false, false};
++    if (!props_json || !props_json[0])
++        return f;
++    yyjson_doc *d = yyjson_read(props_json, strlen(props_json), 0);
++    if (!d)
++        return f;
++    yyjson_val *root = yyjson_doc_get_root(d);
++    if (root && yyjson_is_obj(root)) {
++        f.is_entry = json_truthy(yyjson_obj_get(root, "is_entry_point"));
++        f.is_test = json_truthy(yyjson_obj_get(root, "is_test"));
++        f.is_exported = json_truthy(yyjson_obj_get(root, "is_exported"));
++        yyjson_val *rp = yyjson_obj_get(root, "route_path");
++        if (rp && yyjson_is_str(rp)) {
++            const char *s = yyjson_get_str(rp);
++            f.is_route = s && s[0];
++        }
++    }
++    yyjson_doc_free(d);
++    return f;
++}
++
+ /* ── Node colors/sizes ────────────────────────────────────────── */
+ 
+ /* Stellar spectral type colors — maps node degree to star color.
+@@ -566,6 +623,27 @@ cbm_layout_result_t *cbm_layout_compute(cbm_store_t *store, const char *project,
+     result->node_count = n;
+     result->total_nodes = total_count;
+ 
++    /* True full-graph incoming degree for dead-code classification. This MUST
++     * come from the store, not the sampled `mapped` edges built above: that set
++     * drops any edge whose other endpoint falls outside the rendered
++     * <=max_nodes window, which would falsely mark a sampled-in function as
++     * having zero callers. */
++    int64_t *node_ids = malloc((size_t)n * sizeof(int64_t));
++    int *in_calls = calloc((size_t)n, sizeof(int));
++    int *in_usage = calloc((size_t)n, sizeof(int));
++    int *deg_dummy = calloc((size_t)n, sizeof(int));
++    if (node_ids && in_calls && in_usage && deg_dummy) {
++        for (int i = 0; i < n; i++)
++            node_ids[i] = search_out.results[i].node.id;
++        for (int off = 0; off < n; off += DEAD_DEGREE_CHUNK) {
++            int cnt = (n - off < DEAD_DEGREE_CHUNK) ? (n - off) : DEAD_DEGREE_CHUNK;
++            cbm_store_batch_count_degrees(store, node_ids + off, cnt, "CALLS", in_calls + off,
++                                          deg_dummy + off);
++            cbm_store_batch_count_degrees(store, node_ids + off, cnt, "USAGE", in_usage + off,
++                                          deg_dummy + off);
++        }
++    }
++
+     for (int i = 0; i < n; i++) {
+         const cbm_node_t *sn = &search_out.results[i].node;
+         const char *fp = sn->file_path ? sn->file_path : "";
+@@ -608,11 +686,40 @@ cbm_layout_result_t *cbm_layout_compute(cbm_store_t *store, const char *project,
+         result->nodes[i].name = sn->name ? strdup(sn->name) : NULL;
+         result->nodes[i].qualified_name = sn->qualified_name ? strdup(sn->qualified_name) : NULL;
+         result->nodes[i].file_path = sn->file_path ? strdup(sn->file_path) : NULL;
++        result->nodes[i].start_line = sn->start_line;
++        result->nodes[i].end_line = sn->end_line;
+         result->nodes[i].color = stellar_color(deg[i]);
+         /* Size: base from label + boost from degree (hubs are bigger stars) */
+         float base_size = size_for_label(sn->label);
+         float deg_boost = (deg[i] > 5) ? fminf((float)deg[i] * 0.3f, 10.0f) : 0;
+         result->nodes[i].size = base_size + deg_boost;
++
++        /* Dead-code classification. Only Function/Method are candidates; other
++         * labels are structural. Default to non-dead (1) if the batch degree
++         * query failed, so a query error never masquerades as dead code. */
++        node_flags_t nf = parse_node_flags(sn->properties_json);
++        bool is_fn =
++            sn->label && (strcmp(sn->label, "Function") == 0 || strcmp(sn->label, "Method") == 0);
++        bool testish = nf.is_test || (sn->file_path && cbm_is_test_file_path(sn->file_path));
++        int ic = in_calls ? in_calls[i] : 1;
++        int iu = in_usage ? in_usage[i] : 1;
++        const char *status;
++        if (!is_fn)
++            status = "structural";
++        else if (testish)
++            status = "test";
++        else if (nf.is_entry || nf.is_route)
++            status = "entry";
++        else if (nf.is_exported)
++            status = "exported";
++        else if (ic == 0 && iu == 0)
++            status = "dead";
++        else if (ic == 1)
++            status = "single";
++        else
++            status = "normal";
++        result->nodes[i].in_calls = ic;
++        result->nodes[i].status = status;
+     }
+ 
+     /* 6. Gentle local optimization (anchor-preserving) */
+@@ -641,6 +748,10 @@ cbm_layout_result_t *cbm_layout_compute(cbm_store_t *store, const char *project,
+     free(es);
+     free(ed);
+     free(cdepth);
++    free(node_ids);
++    free(in_calls);
++    free(in_usage);
++    free(deg_dummy);
+     free_edge_array(all_edges, mapped);
+     cbm_store_search_free(&search_out);
+     return result;
+@@ -685,11 +796,20 @@ char *cbm_layout_to_json(const cbm_layout_result_t *r) {
+             yyjson_mut_obj_add_str(doc, nd, "name", r->nodes[i].name);
+         if (r->nodes[i].file_path)
+             yyjson_mut_obj_add_str(doc, nd, "file_path", r->nodes[i].file_path);
++        if (r->nodes[i].qualified_name)
++            yyjson_mut_obj_add_str(doc, nd, "qualified_name", r->nodes[i].qualified_name);
++        if (r->nodes[i].start_line > 0)
++            yyjson_mut_obj_add_int(doc, nd, "start_line", r->nodes[i].start_line);
++        if (r->nodes[i].end_line > 0)
++            yyjson_mut_obj_add_int(doc, nd, "end_line", r->nodes[i].end_line);
+         double nsz = isfinite(r->nodes[i].size) ? (double)r->nodes[i].size : 1.0;
+         yyjson_mut_obj_add_real(doc, nd, "size", nsz);
+         char hex[CBM_SZ_8];
+         snprintf(hex, sizeof(hex), "#%06x", r->nodes[i].color);
+         yyjson_mut_obj_add_strcpy(doc, nd, "color", hex);
++        yyjson_mut_obj_add_int(doc, nd, "in_calls", r->nodes[i].in_calls);
++        if (r->nodes[i].status)
++            yyjson_mut_obj_add_str(doc, nd, "status", r->nodes[i].status);
+         yyjson_mut_arr_append(na, nd);
+     }
+     yyjson_mut_obj_add_val(doc, root, "nodes", na);
+diff --git a/src/ui/layout3d.h b/src/ui/layout3d.h
+index a939d69..20303bf 100644
+--- a/src/ui/layout3d.h
++++ b/src/ui/layout3d.h
+@@ -22,8 +22,14 @@ typedef struct {
+     const char *name;  /* display name */
+     const char *qualified_name;
+     const char *file_path; /* relative file path for tree reconstruction */
+-    float size;            /* visual size */
+-    uint32_t color;        /* 0xRRGGBB */
++    int start_line;        /* 1-based source range (for code snippet / GitHub link) */
++    int end_line;
++    float size;     /* visual size */
++    uint32_t color; /* 0xRRGGBB */
++    int in_calls;   /* incoming CALLS-family degree (full graph, not sampled) */
++    /* Dead-code classification (string literal, NOT freed):
++     * "dead"|"single"|"entry"|"test"|"exported"|"normal"|"structural". */
++    const char *status;
+ } cbm_layout_node_t;
+ 
+ /* ── Layout edge (output) ─────────────────────────────────────── */

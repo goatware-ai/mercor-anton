@@ -52,6 +52,13 @@ to 1, adds "Change Discipline & Patch Reviewability" as 4, merges
 **Working default:** Studio/§4 numbering and names. `gate.py` warns on a name
 mismatch rather than blocking. **Unconfirmed.**
 
+**Studio, 2026-09-15:** the annotation form and its "How this task works"
+instructions score **dimensions 2 to 9** on 1–5. There is no Dimension 1 field.
+8 is "Intermediate Communication & Risk Explanation" and 9 is "Final Summary &
+Presentation Quality". Dimension 0 is pre-filled from the recorded run. See
+[docs/08-task-board.md](docs/08-task-board.md) §0. `gate.py` and
+`templates/annotation.json` still use 1–8 and need updating.
+
 ### 1.3 Which dimension owns diff discipline
 
 `03` §4 puts surgical scope and cleanup under **Dimension 3**, and §5.4 maps its
@@ -72,6 +79,12 @@ the eight dimension scores**: A is all 5s → 5, and B is
 **Working default:** mean of dimensions 1–8, rounded to two decimals. Dimension 0
 is excluded (`03` §4: "not included in the numeric final score"). `gate.py`
 blocks a mismatch. **Unconfirmed.**
+
+**Studio, 2026-09-15:** there is no computed mean. `field_ta_final_quality_score_a/b`
+is its own `likert_scale` 1–5 field, described as "Your overall 1 to 5 for this
+rollout, after the eight dimensions. It must agree with the pairwise preference you
+give in tab F". AutoQC `aq_c1` then derives the preference from the gap: 0 → TIE,
+±1 → *_BETTER, ±2 or more → *_MUCH_BETTER. See docs/11-annotation-form.md.
 
 ### 1.5 Task format value
 
@@ -101,6 +114,12 @@ want", and the walkthrough says rubrics can be answered as trajectories finish.
 qualitative requirements before opening either diff. Answer them afterwards. Add a
 rubric only if a trajectory exposes a requirement that was already implied by one
 of the three legitimate sources, and say so in its reason. **Unconfirmed.**
+
+**Studio, 2026-09-15:** the instructions order the work as read the task → score A
+→ score B → rubrics (tab E). They require **8 to 15** rubrics (1–8 required, 9–15
+optional), each mapped to one dimension, answered for both sides with an evidence
+reason. The board also shows a QC note requiring each side's rubric YES rate to be
+below 75%.
 
 ### 1.8 Rubric `source` enum
 
@@ -138,6 +157,11 @@ task, run the pair and score it.
 **Working default:** do what the Studio assignment says. When authoring, the
 creator also annotates, and the second slot annotates independently.
 
+**Studio, 2026-09-15:** the claimed task's instructions say *"You are not
+authoring the task. The task, both agent rollouts, and the goal-completeness call
+arrive already seeded. Your job is to judge the two rollouts against each other."*
+For this assignment the role is annotator only, and `/create-task` doesn't apply.
+
 ### 1.12 Stale or inconsistent references
 
 - `07-slack.md` and the `04` header call the project **Imperium**, and everything
@@ -156,14 +180,35 @@ The manifest field names in [templates/harbor-task/task.toml](templates/harbor-t
 follow the standard Harbor layout. Our docs don't pin them, so the first task
 that uploads confirms or corrects them here.
 
-*No entries yet.*
+- **2026-09-15, task export JSON.** Consistent across two tasks. It carries the
+  prompt, patches, final answers, Dimension 0 seeds with an automated check, and
+  the full current annotation. It does **not** carry trajectories (S3 links only),
+  the bundle, AutoQC results or reviewer feedback. `tasks/studio.py` unpacks and
+  checks it (docs/09-studio-flow.md).
+- **2026-09-15, string scores count as missing.** `field_ta_dim4_score_b: "3"`
+  showed as "4 · Robustness, Safety & API Stability (B) required" in Navigation.
+  `studio.py check` blocks it.
+- **2026-09-15, reconstructed patches.** When the harness captures no diff, the
+  patch field is rebuilt from edit calls. Offsets are relative and shell edits are
+  missing. Don't charge its artifacts to the agent.
+- **2026-09-15, the export has a Dimension 0 automated check.** For
+  `deusdata-…-863`, `field_part1_disposition: REJECT_BOTH_FAIL` sat under seeded
+  PARTIAL/PARTIAL.
 
 ## 3. Review and AutoQC outcomes
 
 One line per returned task: what came back, the reason given, what fixed it, and
 whether a `gate.py` check was added.
 
-*No entries yet.*
+- **2026-09-15 · deusdata-codebase-memory-mcp-863 (inherited, not our
+  submission).**
+  - **Returned by the reviewer:** "Both Model A and Model B must have a rubric pass
+    rate strictly below 75%" (B was 10/10). AutoQC also failed `aq_a1` atomicity
+    on 3 compound rubrics.
+  - **Checks added to `studio.py check`:** both-sides pass rate, exact
+    preference-gap label, compound-rubric warning.
+  - **Fix:** pending. The task looks defective (hidden-test interface not in the
+    prompt).
 
 ## 4. Task shapes and the A/B signal they produced
 

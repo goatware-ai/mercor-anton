@@ -11,13 +11,11 @@
 
 ## 2. Please read through the entirety of this document
 
-These tasks require careful software-engineering judgment and strong instruction following. Read the complete workflow before claiming or opening a task. Ask questions about missing task context, missing artifacts, or unclear requirements before investing substantial time. **We are running a promotional period of a $50 bonus for tasks through the 8/18 6PM (PST).** In order to get this promotion, it is imperative that you do NOT use LLMs to do your annotations, that your work is original, and that you produce high quality and well thought out annotations.
+These tasks require careful software-engineering judgment and strong instruction following. Read the complete workflow before claiming or opening a task. Ask questions about missing task context, missing artifacts, or unclear requirements before investing substantial time. **We are running a promotional period of a $50 bonus for tasks through the 8/18 6PM (PST).** In order to get this promotion, it is imperative that you produce high quality and well thought out annotations.
 
 ## 3. Claim a task on Studio
 
 Claim one SWE Task QC task in Studio. Please complete one task fully before claiming another. Each task is assigned to two annotators (marked as **· slot 1 OR · slot 2)** so that the project can compare independent judgments. Do not share labels, rationales, rollouts, or conclusions with the other annotator before you submit your own work. Alternatively, you can filter by “*Annotator Slot*"
-
-*[Screenshot: Studio task list showing two tasks, "Add Interleaved Multi-Session Streaming S..." and "DNSSEC denial proof records · dnsjava", both marked Unclaimed, with "Mayank Bharati" in the two following columns]*
 
 Please ONLY claim one task.
 

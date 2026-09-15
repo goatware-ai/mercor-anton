@@ -63,14 +63,6 @@ The annotation must also distinguish a genuine task solution from a trajectory t
 
 Write concise, factual rationales. Explain what the task, trajectory, patch, and verification evidence show and why they support the selected rubric answer. Do not include generic commentary, unsupported certainty, repeated statements, or personal speculation.
 
-## LLM Policy
-
-You may use LLMs for research, coding assistance, testing, and review. You may not use them as a substitute for your own judgment when annotating trajectories.
-
-The expert owns the solution. You tell the LLM what to do, not "claude/codex take the wheel" - and that matters more as tasks get harder. If asked to defend a decision, "the LLM suggested it" is not an acceptable answer.
-
-Obvious LLM slop results in an instant offboarding, even on a first offense after a great track record. Reviewers should never have to check whether your docstring, comments, or code contain slop; it must be understood by all parties that this is not allowed. Slop includes verbose generic comments, contradictory docstrings, stale references to reviewer feedback, fake certainty, irrelevant abstractions, and code that looks plausible but does not match the task.
-
 ## Reviewer Handoff
 
 The reviewer should be able to answer these questions quickly:

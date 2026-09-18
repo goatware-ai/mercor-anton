@@ -125,7 +125,7 @@ F pairwise → G AutoQC and submit. H is the reviewer's. Our steps map onto them
 | 8 | **Answer every rubric** for both sides with evidence. Each side's YES rate must be **below 75%** (≤5 of 8, ≤7 of 10, ≤11 of 15). Get there by writing rubrics that separate the sides, never by changing an answer the evidence doesn't support | Rubric panels | `check` shows the rates below 75% |
 | 9 | **Pairwise verdict.** The label is fixed by the final-score gap A − B: 0 → TIE, ±1 → *_BETTER, ±2 or more → *_MUCH_BETTER (AutoQC `aq_c1`). Choose the final scores honestly and the label follows; write the rationale from evidence already cited | Pairwise Verdict | `check` shows the exact label |
 | 10 | **Draft in the repo, then paste into Studio.** Keep the full text in `tasks/<task-id>/annotation-draft.md`. Save Changes, re-export, `unpack`, `check` | Save Changes | `check`: 0 BLOCK |
-| 11 | **Self-review:** `/review-task`. Re-open every cited step and line | — | every citation confirmed |
+| 11 | **Self-review:** `/review-task`. Re-open every cited step and line, and run `tasks/prose.py` (docs/12) over the draft | — | every citation confirmed; no prose ERROR |
 | 12 | **AutoQC.** Run it, fix what it flags, re-run until 17/17. Navigation checklist all green | Deliverable AutoQC, Submit review | 17/17 and no ✗ in Navigation |
 | 13 | **Submit for Final QC.** Update the board status. When review comes back, add a FIELD-NOTES §3 line and, if a script could have caught it, a `studio.py` check | Submit for Final QC | status `submitted` in docs/08 |
 
@@ -222,13 +222,11 @@ transcript confirms it.
 
 One line per task: which method produced the files.
 
-- **2026-09-15 · deusdata-codebase-memory-mcp-863:** sanitized HAR (79 MB, no
-  cookie or auth headers). `har` got the task, 9 of 10 bundle files, transcript and
-  logs for A, the reviewer comment, 8 history versions, 5 AutoQC audits and 8 QC
-  specs. Missed B's transcript and logs (Model B tab not opened) and
-  `environment/prompt_statement.md` (not clicked).
-- **2026-09-15 · same task, second HAR** (225 MB, 983 requests, sanitized): got
-  B's transcript and logs too. Everything except `prompt_statement.md`.
-- **2026-09-15 · tools/studio-capture v1.0.0 built.** Tested only in simulation
-  (replaying this task's HAR): the `har` output was byte-identical. First live
+- **2026-09-15 · first DevTools HAR** (79 MB, sanitized, no cookie or auth
+  headers): got everything except Model B's transcript and logs (the Model B tab
+  was not opened) and one bundle file that was not clicked.
+- **2026-09-15 · second DevTools HAR** (225 MB, 983 requests): with the Model B tab
+  opened, both transcripts came through.
+- **2026-09-15 · tools/studio-capture v1.0.0 built.** Tested only in simulation,
+  replaying a real task's HAR: the `har` output was byte-identical. First live
   capture: pending. Record the result here.

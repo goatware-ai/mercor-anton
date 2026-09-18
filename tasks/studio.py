@@ -35,6 +35,9 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import prose  # noqa: E402  (same directory)
+
 REPO = Path(__file__).resolve().parent.parent
 DIMENSIONS = {
     2: "Architecture, Modularity & Trade-off Soundness",
@@ -482,6 +485,10 @@ results = []
 COMPOUND = re.compile(r"\b(and|or)\b|,")
 
 
+def note(level, ok, message):
+    results.append((level, bool(ok), message))
+
+
 def block(ok, message):
     results.append(("BLOCK", bool(ok), message))
 
@@ -537,6 +544,17 @@ def check(path):
         warn("reconstructed" not in prov,
              f"{s.upper()}: patch is a captured diff, not reconstructed from tool calls "
              "(reconstructed hunks and missing shell edits are harness artifacts, not agent behavior)")
+
+    # Reason prose: LLM tells and the evidence rule (tasks/prose.py, docs/12)
+    reasons = [(f"{s.upper()} dim {d}", cf.get(f"field_ta_dim{d}_reason_{s}"))
+               for s in "ab" for d in DIMENSIONS]
+    reasons += [(f"rubric {r['n']} {s.upper()}", r[f"reason_{s}"]) for r in rubrics(task) for s in "ab"]
+    reasons.append(("comparative rationale", cf.get(F_RATIONALE)))
+    for tag, text in reasons:
+        for sev, cid, label, fix, _line, hit in prose.check_reason(text or ""):
+            note(sev if cid != "em-dash" else "WARN", False,
+                  f"{tag}: {label} — {hit!r}; {fix}" if cid != "no-evidence"
+                  else f"{tag}: {label}; {fix}")
 
     # Dimensions 2-9 and final score
     final = {}

@@ -191,24 +191,21 @@ that uploads confirms or corrects them here.
 - **2026-09-15, reconstructed patches.** When the harness captures no diff, the
   patch field is rebuilt from edit calls. Offsets are relative and shell edits are
   missing. Don't charge its artifacts to the agent.
-- **2026-09-15, the export has a Dimension 0 automated check.** For
-  `deusdata-…-863`, `field_part1_disposition: REJECT_BOTH_FAIL` sat under seeded
-  PARTIAL/PARTIAL.
+- **2026-09-15, the export has a Dimension 0 automated check.** It can say
+  `field_part1_disposition: REJECT_BOTH_FAIL` under a seeded PARTIAL/PARTIAL.
 
 ## 3. Review and AutoQC outcomes
 
 One line per returned task: what came back, the reason given, what fixed it, and
 whether a `gate.py` check was added.
 
-- **2026-09-15 · deusdata-codebase-memory-mcp-863 (inherited, not our
-  submission).**
+- **2026-09-15 · an inherited returned task (not our submission; unassigned
+  2026-09-18).**
   - **Returned by the reviewer:** "Both Model A and Model B must have a rubric pass
-    rate strictly below 75%" (B was 10/10). AutoQC also failed `aq_a1` atomicity
-    on 3 compound rubrics.
+    rate strictly below 75%" (one side was 10/10). AutoQC also failed `aq_a1`
+    atomicity on 3 compound rubrics.
   - **Checks added to `studio.py check`:** both-sides pass rate, exact
     preference-gap label, compound-rubric warning.
-  - **Fix:** pending. The task looks defective (hidden-test interface not in the
-    prompt).
 
 ## 4. Task shapes and the A/B signal they produced
 

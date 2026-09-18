@@ -16,17 +16,7 @@ don't claim a task whose annotation has been read here.
 
 ## 0. Claimed
 
-| Task | Status in Studio | Claimed | Local folder | Our status |
-|---|---|---|---|---|
-| `deusdata-codebase-memory-mcp-863__delivery_4_remediated [model A/B]` | Annotating (returned) | 2026-09-15 | [tasks/deusdata-codebase-memory-mcp-863__delivery_4_remediated/](../tasks/deusdata-codebase-memory-mcp-863__delivery_4_remediated/) | **blocked: likely defective task** (hidden tests require `status: "dead"` and a `repoInfo` prop the prompt never states). Ask in #anton-general-bf1. See its `notes.md` |
-
-- This task was not on the 2026-09-15 board export. It's a **returned** annotation:
-  In Review by 00a64646 on 9/15, then released by bb825946.
-- Gemini is A, Opus 5 is B.
-- Seeded PARTIAL / PARTIAL, but the automated check says `REJECT_BOTH_FAIL` (both
-  recorded scores 0.0).
-- `studio.py check`: 4 BLOCK. They are the Dimension 0 disposition, B's dims 4 and
-  5 stored as strings, and B's rubric YES rate at 100%.
+No task is claimed.
 
 ### The Studio "How this task works" page (read 2026-09-15, all six steps)
 
@@ -269,5 +259,5 @@ for r in rows:
 
 - **2026-09-15:** first snapshot, 10 Claimable tasks. Recommended first pick #3,
   backup #8.
-- **2026-09-15:** claimed `deusdata-codebase-memory-mcp-863__delivery_4_remediated`
-  (not on the board export). Recorded steps 1–4 of Studio's instructions.
+- **2026-09-15:** first task claimed. Recorded Studio's "How this task works" steps.
+- **2026-09-18:** that task was unassigned; its local folder and drafts were removed.

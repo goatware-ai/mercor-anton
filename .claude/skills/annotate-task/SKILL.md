@@ -58,8 +58,13 @@ the gate's package checks were skipped.
 
 ```bash
 python3 tasks/studio.py check tasks/<task-id>   # Studio task: re-export after Save Changes first
+python3 tasks/prose.py tasks/<task-id>          # LLM prose tells in notes and drafts
 python3 tasks/gate.py tasks/<task-id>           # local annotation.json / Harbor package
 ```
+
+Fix every prose ERROR before handing a draft over, and read the reasons aloud:
+docs/12-llm-prose-tells.md. Reviewers on the sibling project rejected submissions
+for prose that reads as model-written.
 
 Every BLOCK must PASS. Then re-open each cited reference and confirm it says what
 the reason claims — the gate cannot check that. Hand back the prompt's deliverables.

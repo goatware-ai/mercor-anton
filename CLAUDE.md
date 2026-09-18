@@ -45,6 +45,10 @@ Three kinds of work happen here:
   - [10-autoqc-rules.md](docs/10-autoqc-rules.md): the exact AutoQC and reviewer-audit
     criteria, generated from Studio's QC specs. Where they disagree with the docs,
     these are what a submission is graded against.
+  - [12-llm-prose-tells.md](docs/12-llm-prose-tells.md): the prose shapes reviewers
+    reject as LLM-written, ported from `../snk-geranium`, enforced by
+    `tasks/prose.py`. **Run it on every note, draft and annotation before handing it
+    over.**
   - [11-annotation-form.md](docs/11-annotation-form.md): the Studio annotation form
     itself — every field, the 1–5 band text per dimension, the option lists and the
     15-word minimum on reasons. Generated from the world's `task_schema`.
@@ -135,7 +139,8 @@ python3 tasks/studio.py har "<file.har>"            # sanitized HAR -> studio/, 
 python3 tasks/studio.py unpack "<task-export.json>"  # Studio export -> tasks/<task-id>/studio/
 python3 tasks/studio.py rules tasks/<task-id>/studio/qc-specs.json  # regenerate docs/10-autoqc-rules.md
 python3 tasks/studio.py form tasks/<task-id>/studio/form-schema.json # regenerate docs/11-annotation-form.md
-python3 tasks/studio.py check tasks/<task-id>        # Studio-form rules; 0 BLOCK before submitting
+python3 tasks/studio.py check tasks/<task-id>        # Studio-form rules + reason prose; 0 BLOCK before submitting
+python3 tasks/prose.py tasks/<task-id> notes.md     # LLM prose tells in anything we wrote
 ```
 
 There's no Studio CLI. Rollouts, the Task form and the annotation form are all
@@ -151,6 +156,10 @@ rollouts.
   requirement.
 - **Never fabricate** reviewer, AutoQC or IAA values, trajectory evidence, or test
   output. If something wasn't run, say so.
+- **Write like a person.** Every sentence in a note or a reason carries a checkable
+  fact: a record number, a `file:line`, a test name, quoted output. No slogans, no
+  hedged filler, no em dashes in Studio text. Run `tasks/prose.py`
+  (docs/12-llm-prose-tells.md) before handing anything over.
 - **Independence:** never share labels, rationales or conclusions with the other
   annotator slot before submission.
 - **One claimed task at a time.** Don't hoard.

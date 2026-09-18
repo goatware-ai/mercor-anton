@@ -16,6 +16,7 @@ Your job is to judge the two rollouts against each other."*
 | Piece | Studio location | API endpoint (`api.studio.mercor.com`) | Local path after `studio.py har` |
 |---|---|---|---|
 | Task: prompt, models, Dim 0 seed and automated check, patches, final answers, current annotation | whole page | `GET /tasks/{task_id}` | `studio/export.json`, `meta.md`, `prompt.md`, `patch_*.diff`, `final_answer_*.md`, `annotation-current.md` |
+| **Task list** (the board): every task of a world with its custom fields, 100 per page | Tasks page, with its filters | `GET /tasks/world/{world_id}/detailed?page=&page_size=&filters=&sort_dir=` → `tasks`, `pagination.total_count` | `notes/board-<date>.md` — extension board capture, then `studio.py board` |
 | Rubric criteria, with source and mapped dimension | Rubric (create) | `GET /verifiers/task/{task_id}` | `studio/annotation-current.md` |
 | **Task bundle** (10 files, including `environment/prompt_statement.md`) | Tab B · Task bundle | `GET /snapshots/task/{id}/input-files` (list), then `/file-url?file_path=` → signed S3 `GET` | `harbor/<same path>` |
 | **Trajectories** (every message) | Trajectory Viewer → Model A / Model B | `GET /trajectories/{traj_id}` (A/B from the run ledger) | `trajectories/transcript_A.json`, `_B.json` |
@@ -97,6 +98,16 @@ Studio may store something different from what you typed. For example,
   and `studio/autoqc.md`.
 - Don't copy the LOGS list by hand. The rows are collapsed and only partly drawn,
   so a copy loses content.
+
+### 2.0 Before claiming: capture the board
+
+On the task list page the extension button reads **⬇ Capture board (N tasks
+seen)**. Click it, then run
+`python3 tasks/studio.py board "/mnt/c/Users/klayt/Downloads/studio-board_<…>.har"`.
+It writes `notes/board-<date>.md`; update [08-task-board.md](08-task-board.md) §2
+from that file. Set the Status filter first: the capture takes the list on screen,
+and the button shows how many of the filter's tasks it holds (**52 of 52 tasks**).
+Details: tools/studio-capture/README.md.
 
 ### 2.4 The extension, and when to fix it
 

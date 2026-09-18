@@ -111,7 +111,7 @@ templates/harbor-task/    working reference Harbor task (swe-smoke-002)
 templates/annotation.json evaluation-report skeleton, Studio dimension names
 tasks/gate.py             local pre-submission gate (package + annotation)
 tasks/studio.py           Studio capture/export unpacker + Studio-form checks
-tools/studio-capture/     Chrome extension: one-click capture of a Studio task
+tools/studio-capture/     Chrome extension: one-click capture of a Studio task or the task board
 tasks/<task-id>/          one folder per task — see below
 drafts/, notes/           work in progress, per-task write-ups
 .claude/skills/           create-task, annotate-task, review-task
@@ -136,6 +136,7 @@ verbatim.
 python3 tasks/gate.py tasks/<task-id>        # every BLOCK line must PASS before submitting
 python3 tasks/gate.py templates/harbor-task  # blocks only on its REPLACE author fields
 python3 tasks/studio.py har "<file.har>"            # sanitized HAR -> studio/, harbor/, trajectories/ (primary fetch)
+python3 tasks/studio.py board "<studio-board.har>"  # extension board capture -> notes/board-<date>.md
 python3 tasks/studio.py unpack "<task-export.json>"  # Studio export -> tasks/<task-id>/studio/
 python3 tasks/studio.py rules tasks/<task-id>/studio/qc-specs.json  # regenerate docs/10-autoqc-rules.md
 python3 tasks/studio.py form tasks/<task-id>/studio/form-schema.json # regenerate docs/11-annotation-form.md

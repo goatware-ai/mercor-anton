@@ -202,6 +202,13 @@ A note is not a score for either trajectory.
 
 ## 4. Reading a board export
 
+**Preferred since 2026-09-18:** the extension's board capture plus
+`python3 tasks/studio.py board <studio-board_….har>`
+([09-studio-flow.md](09-studio-flow.md) §2.0). It reads the custom fields by name,
+so the column map below isn't needed, and it adds status, owner and review cycles.
+First live run 2026-09-18: [notes/board-2026-09-18.md](../notes/board-2026-09-18.md),
+52 Claimable tasks. The CSV export remains the fallback.
+
 Studio's CSV export has an **empty first row with no column names**. Columns are
 0-indexed; this map was verified against the cell contents of the 2026-09-15 export.
 
@@ -261,3 +268,8 @@ for r in rows:
   backup #8.
 - **2026-09-15:** first task claimed. Recorded Studio's "How this task works" steps.
 - **2026-09-18:** that task was unassigned; its local folder and drafts were removed.
+- **2026-09-18:** added the extension board capture and `studio.py board` (§4).
+  First capture: 52 Claimable of 150 tasks in the world, 49 opencode and 3
+  terminus_2, in [notes/board-2026-09-18.md](../notes/board-2026-09-18.md). §2 and
+  §3 still describe the 10-task snapshot of 2026-09-15; none of the 52 has been
+  audited.

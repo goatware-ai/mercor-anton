@@ -5,6 +5,9 @@
  * requests the page makes when you click through its tabs, and downloads one
  * HAR-shaped file that `python3 tasks/studio.py har <file>` unpacks.
  *
+ * On a task list page the same button becomes "Capture board": it downloads every
+ * task the page listed, for `python3 tasks/studio.py board <file>`.
+ *
  * Credentials: the script runs in the page and reuses the headers of the page's
  * own most recent API request (authorization, x-account-id, x-campaign-id,
  * x-company-id). They live only in memory and are never written to the file.
@@ -36,7 +39,22 @@
     } catch (_) {
       /* never interfere with the page's own request */
     }
-    return originalFetch(input, init);
+    const result = originalFetch(input, init);
+    try {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+      const method = ((init && init.method) || (input instanceof Request ? input.method : "GET")).toUpperCase();
+      if (url.origin === API && method === "GET" && !TASK_PATH.test(location.pathname)) {
+        const page = location.pathname;
+        const seq = ++requestSeq;
+        result.then((res) => {
+          if (!res.ok || !/json/.test(res.headers.get("content-type") || "")) return;
+          res.clone().text().then((text) => noteBoardResponse(page, url, text, seq)).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch (_) {
+      /* same */
+    }
+    return result;
   };
 
   function apiHeaders(tokenOverride) {
@@ -44,6 +62,58 @@
     if (pageInit) for (const k of KEEP_HEADERS) if (pageInit.headers.has(k)) h.set(k, pageInit.headers.get(k));
     if (tokenOverride) h.set("authorization", `Bearer ${tokenOverride}`);
     return h;
+  }
+
+  /* ── Board: task ids seen on a list page ─────────────────────────────────
+     Nothing here requests the list. The ids come from the page's own list
+     responses (GET /tasks/world/{world_id}/detailed, seen 2026-09-18), or from
+     the task links it draws when no list response was seen. Each task is then
+     fetched through GET /tasks/{id}. The list responses are saved too.
+
+     A view is one list query: its path and query string without `page`. Pages of
+     the same view add up. A response for a different view (a new filter or sort)
+     replaces what was held, so the ids match the list on screen and not every
+     list the page loaded on the way there. */
+  const TASK_ID_KEY = /"task_id"\s*:\s*"(task_[0-9a-f]{32})"/g;
+  const TOTAL_COUNT = /"total_count"\s*:\s*(\d+)/;
+  const TASK_LINK = /\/tasks\/(task_[0-9a-f]{32})/;
+  const MAX_LISTS = 20;
+  let requestSeq = 0;
+  let board = null; // { page, view, seq, ids: Set, lists: [{ url, text }], total }
+
+  function viewOf(url) {
+    const q = new URLSearchParams(url.search);
+    q.delete("page");
+    q.sort();
+    return `${url.pathname}?${q}`;
+  }
+
+  function noteBoardResponse(page, url, text, seq) {
+    const ids = new Set();
+    for (const m of text.matchAll(TASK_ID_KEY)) ids.add(m[1]);
+    if (ids.size < 2) return; // a single task, not a list
+    const view = viewOf(url);
+    if (!board || board.page !== page || board.view !== view) {
+      // A slow response to a query the page has since replaced must not win.
+      if (board && board.page === page && seq < board.seq) return;
+      board = { page, view, seq, ids: new Set(), lists: [], total: null };
+    }
+    board.seq = Math.max(board.seq, seq);
+    ids.forEach((id) => board.ids.add(id));
+    const total = text.match(TOTAL_COUNT);
+    if (total) board.total = Number(total[1]);
+    const href = url.origin + url.pathname + url.search;
+    board.lists = board.lists.filter((l) => l.url !== href).concat({ url: href, text }).slice(-MAX_LISTS);
+  }
+
+  /* Fallback when the page made no list request the hook saw: the links drawn now. */
+  function linkedTaskIds() {
+    const found = new Set();
+    for (const a of document.querySelectorAll('a[href*="/tasks/task_"]')) {
+      const m = (a.getAttribute("href") || "").match(TASK_LINK);
+      if (m) found.add(m[1]);
+    }
+    return [...found];
   }
 
   /* ── Capture ─────────────────────────────────────────────────────────── */
@@ -56,7 +126,8 @@
     return btoa(binary);
   }
 
-  async function captureTask(taskId, progress) {
+  /* One capture's saved entries and errors, plus the authenticated GET that fills them. */
+  function newCapture() {
     const entries = [];
     const errors = [];
     const record = (url, status, mimeType, text, encoding) =>
@@ -84,6 +155,12 @@
         return null;
       }
     }
+
+    return { entries, errors, record, api };
+  }
+
+  async function captureTask(taskId, progress) {
+    const { entries, errors, record, api } = newCapture();
 
     /* A snapshot file: ask for a signed URL (never saved), then save the bytes. */
     async function fetchSnapshotFile(urlPath, rel) {
@@ -156,7 +233,7 @@
     return {
       log: {
         version: "1.2",
-        creator: { name: "anton-studio-capture", version: "1.0.0" },
+        creator: { name: "anton-studio-capture", version: "1.1.1" },
         entries,
         _capture: {
           task_id: taskId,
@@ -170,13 +247,53 @@
     };
   }
 
-  function download(har, taskName) {
-    const slug = (taskName || har.log._capture.task_id).replace(/[^\w.-]+/g, "_").slice(0, 80);
+  /* Every task on the board, through the same GET /tasks/{id} the task page uses.
+     task_schema (the form definition, ~90% of each response) is dropped: it is the
+     same for every task in a world and a task capture already saves it. */
+  async function captureBoard(ids, progress) {
+    const { entries, errors, record, api } = newCapture();
+    const lists = board && board.page === location.pathname ? board.lists : [];
+    const listedTotal = lists.length ? board.total : null;
+    for (const l of lists) record(l.url, 200, "application/json", l.text);
+    const queue = [...ids];
+    let done = 0;
+    const worker = async () => {
+      for (let id = queue.shift(); id; id = queue.shift()) {
+        const task = await api(`/tasks/${id}`, { save: false });
+        progress(`task ${++done}/${ids.length}`);
+        if (!task) continue;
+        delete task.task_schema;
+        record(`${API}/tasks/${id}`, 200, "application/json", JSON.stringify(task));
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    if (entries.length === lists.length) {
+      throw new Error("Could not load any task. Reload the page (F5), wait for it to finish, then click Capture again.");
+    }
+    return {
+      log: {
+        version: "1.2",
+        creator: { name: "anton-studio-capture", version: "1.1.1" },
+        entries,
+        _capture: {
+          kind: "board",
+          page: location.pathname + location.search,
+          captured_at: new Date().toISOString(),
+          tasks: entries.length - lists.length,
+          listed_total: listedTotal,
+          errors,
+        },
+      },
+    };
+  }
+
+  function download(har, name) {
+    const slug = name.replace(/[^\w.-]+/g, "_").slice(0, 96);
     const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
     const blob = new Blob([JSON.stringify(har)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `studio-capture_${slug}_${stamp}.har`;
+    a.download = `${slug}_${stamp}.har`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
@@ -188,10 +305,30 @@
   /* ── Button ──────────────────────────────────────────────────────────── */
   let button = null;
   let busy = false;
+  let holdUntil = 0; // the 1s route poll must not wipe a result message
+  let lastPath = null;
+
+  /* On a task page the button captures the task. On any other page it appears
+     once task ids have been seen there, and captures the board. */
+  function boardTaskIds() {
+    if (board && board.page === location.pathname) return [...board.ids];
+    return linkedTaskIds();
+  }
+
+  function boardLabel(n) {
+    const total = board && board.page === location.pathname ? board.total : null;
+    if (total == null) return `${n} tasks seen`;
+    return n < total ? `${n} of ${total} tasks; open the other pages first` : `${n} of ${total} tasks`;
+  }
 
   function ensureButton() {
-    const match = location.pathname.match(TASK_PATH);
-    if (!match) {
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      holdUntil = 0;
+    }
+    const onTask = TASK_PATH.test(location.pathname);
+    const ids = onTask ? [] : boardTaskIds();
+    if (!onTask && !ids.length && !busy) {
       if (button) button.style.display = "none";
       return;
     }
@@ -208,26 +345,30 @@
       document.body.appendChild(button);
     }
     button.style.display = "block";
-    if (!busy) button.textContent = "⬇ Capture task for review";
+    if (busy || Date.now() < holdUntil) return; // leave progress and the result on screen
+    button.textContent = onTask ? "⬇ Capture task for review" : `⬇ Capture board (${boardLabel(ids.length)})`;
   }
 
   async function onClick() {
+    if (busy) return;
     const match = location.pathname.match(TASK_PATH);
-    if (!match || busy) return;
+    const ids = match ? [] : boardTaskIds();
+    if (!match && !ids.length) return;
     busy = true;
     const label = (t) => (button.textContent = `⏳ Capturing: ${t}`);
     try {
-      const har = await captureTask(match[1], label);
-      download(har, har.log._capture.task_name);
+      const har = match ? await captureTask(match[1], label) : await captureBoard(ids, label);
       const c = har.log._capture;
+      download(har, match ? `studio-capture_${c.task_name || c.task_id}` : "studio-board");
+      const saved = match ? `${c.trajectories} trajectories, ${c.bundle_files} bundle files` : `${c.tasks} board tasks`;
       button.textContent = c.errors.length
         ? `⚠ Saved with ${c.errors.length} error(s): ${c.errors.slice(0, 3).join(", ")}`
-        : `✅ Saved: ${c.trajectories} trajectories, ${c.bundle_files} bundle files`;
+        : `✅ Saved: ${saved}`;
     } catch (e) {
       button.textContent = `❌ ${e.message}`;
     } finally {
       busy = false;
-      setTimeout(ensureButton, 15000);
+      holdUntil = Date.now() + 15000;
     }
   }
 
